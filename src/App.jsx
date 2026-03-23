@@ -498,8 +498,10 @@ function HoverRig({
     const keyboardLift =
       (keys.current.Space || keys.current.KeyE ? 1 : 0) -
       (keys.current.ShiftLeft || keys.current.ShiftRight || keys.current.KeyQ ? 1 : 0);
-    const mobileTurn = mobileInputRef?.current?.turn ?? 0;
-    const mobileThrust = mobileInputRef?.current?.thrust ?? 0;
+    const mobileTurn =
+      (mobileInputRef?.current?.tiltTurn ?? 0) + (mobileInputRef?.current?.manualTurn ?? 0);
+    const mobileThrust =
+      (mobileInputRef?.current?.tiltThrust ?? 0) + (mobileInputRef?.current?.manualThrust ?? 0);
     const mobileLift = mobileInputRef?.current?.lift ?? 0;
 
     const turnInput = clamp(keyboardTurn + mobileTurn, -1, 1);
@@ -1033,43 +1035,47 @@ function GameHud({ boom, isMobile }) {
       <div
         style={{
           position: "absolute",
-          top: 16,
+          top: isMobile ? 186 : 16,
           left: 16,
           border: "1px solid rgba(34, 211, 238, 0.9)",
           borderRadius: 12,
-          padding: "14px 16px",
-          fontSize: 17,
-          lineHeight: 1.65,
+          padding: isMobile ? "10px 12px" : "14px 16px",
+          fontSize: isMobile ? 12 : 17,
+          lineHeight: isMobile ? 1.35 : 1.65,
           background: "rgba(2, 6, 23, 0.92)",
-          maxWidth: 500,
+          maxWidth: isMobile ? 250 : 500,
           boxShadow: "0 14px 32px rgba(0,0,0,0.55)",
           color: "#e0f2fe",
         }}
       >
-        <div style={{ fontSize: 20, fontWeight: 800, color: "#67e8f9", marginBottom: 8 }}>
+        <div style={{ fontSize: isMobile ? 14 : 20, fontWeight: 800, color: "#67e8f9", marginBottom: 8 }}>
           Flight Instructions
         </div>
-        ARROWS: TURN + THRUST
-        <br />
-        E or SPACE: GO UP
-        <br />
-        Q or SHIFT: GO DOWN
-        <br />
-        RIGHT MOUSE DRAG: LOOK AROUND
-        <br />
-        RELEASE RMB or R: RECENTER VIEW
-        <br />
-        SEARCH BUILDING: highlight + camera assist
-        <br />
-        MINI-MAP: jump near highlighted tower
         {isMobile ? (
           <>
+            TILT: steer + move
             <br />
-            MOBILE: tilt phone to steer and move
+            TOUCH: use LEFT/RIGHT/FORWARD/BACK
             <br />
-            MOBILE: hold UP/DOWN buttons to change altitude
+            HOLD UP/DOWN: altitude
           </>
-        ) : null}
+        ) : (
+          <>
+            ARROWS: TURN + THRUST
+            <br />
+            E or SPACE: GO UP
+            <br />
+            Q or SHIFT: GO DOWN
+            <br />
+            RIGHT MOUSE DRAG: LOOK AROUND
+            <br />
+            RELEASE RMB or R: RECENTER VIEW
+            <br />
+            SEARCH BUILDING: highlight + camera assist
+            <br />
+            MINI-MAP: jump near highlighted tower
+          </>
+        )}
       </div>
 
       {boom ? (
@@ -1103,8 +1109,8 @@ function GameHud({ boom, isMobile }) {
   );
 }
 
-function MiniMap({ buildings, cityRadius, helicopter, highlightedBuilding, onJump }) {
-  const size = 220;
+function MiniMap({ buildings, cityRadius, helicopter, highlightedBuilding, onJump, isMobile }) {
+  const size = isMobile ? 138 : 220;
   const half = size / 2;
   const pad = 14;
   const scale = (value) => (value / (cityRadius + 8)) * (half - pad);
@@ -1114,9 +1120,9 @@ function MiniMap({ buildings, cityRadius, helicopter, highlightedBuilding, onJum
       style={{
         position: "absolute",
         left: 16,
-        bottom: 18,
+        bottom: isMobile ? 18 : 18,
         zIndex: 32,
-        width: 250,
+        width: isMobile ? 155 : 250,
         background: "rgba(2, 6, 23, 0.9)",
         border: "1px solid rgba(34, 211, 238, 0.6)",
         borderRadius: 12,
@@ -1126,7 +1132,9 @@ function MiniMap({ buildings, cityRadius, helicopter, highlightedBuilding, onJum
         fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
       }}
     >
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8, color: "#67e8f9" }}>Mini Map</div>
+      <div style={{ fontSize: isMobile ? 12 : 15, fontWeight: 700, marginBottom: 8, color: "#67e8f9" }}>
+        Mini Map
+      </div>
       <svg width={size} height={size} style={{ display: "block", background: "#030712", borderRadius: 8 }}>
         <rect x="0" y="0" width={size} height={size} fill="#020617" />
         <circle cx={half} cy={half} r={half - 8} stroke="#0e7490" strokeWidth="1" fill="none" opacity="0.6" />
@@ -1159,20 +1167,22 @@ function MiniMap({ buildings, cityRadius, helicopter, highlightedBuilding, onJum
           width: "100%",
           border: "none",
           borderRadius: 8,
-          padding: "10px 12px",
+          padding: isMobile ? "8px 8px" : "10px 12px",
           background: highlightedBuilding ? "#22c55e" : "#334155",
           color: highlightedBuilding ? "#052e16" : "#94a3b8",
           fontWeight: 700,
+          fontSize: isMobile ? 11 : 14,
           cursor: highlightedBuilding ? "pointer" : "default",
         }}
       >
-        Jump To Highlighted User
+        {isMobile ? "Jump Highlight" : "Jump To Highlighted User"}
       </button>
     </div>
   );
 }
 
-function StatsPanel({ fps, buildingCount, apiStatus }) {
+function StatsPanel({ fps, buildingCount, apiStatus, isMobile }) {
+  if (isMobile) return null;
   const resetTime = apiStatus.resetEpoch
     ? new Date(apiStatus.resetEpoch).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "--";
@@ -1215,7 +1225,9 @@ function MobileFlightControls({
   motionEnabled,
   motionSupported,
   onEnableMotion,
+  onMoveChange,
   onLiftChange,
+  motionMessage,
 }) {
   if (!isMobile) return null;
 
@@ -1226,7 +1238,7 @@ function MobileFlightControls({
         right: 14,
         bottom: 18,
         zIndex: 40,
-        width: 220,
+        width: 210,
         background: "rgba(2, 6, 23, 0.88)",
         border: "1px solid rgba(34, 211, 238, 0.55)",
         borderRadius: 12,
@@ -1239,8 +1251,11 @@ function MobileFlightControls({
       }}
     >
       <div style={{ fontWeight: 700, color: "#67e8f9", marginBottom: 6 }}>Mobile Flight</div>
-      <div style={{ marginBottom: 8 }}>
+      <div style={{ marginBottom: 6 }}>
         {motionEnabled ? "Tilt steering active" : "Enable motion controls for tilt steering"}
+      </div>
+      <div style={{ marginBottom: 8, fontSize: 11, color: "#93c5fd", minHeight: 30 }}>
+        {motionMessage}
       </div>
       {!motionEnabled ? (
         <button
@@ -1260,6 +1275,72 @@ function MobileFlightControls({
           {motionSupported ? "Enable Tilt Controls" : "Motion Not Supported"}
         </button>
       ) : null}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+        <button
+          onPointerDown={() => onMoveChange(-1, 0)}
+          onPointerUp={() => onMoveChange(0, 0)}
+          onPointerCancel={() => onMoveChange(0, 0)}
+          onPointerLeave={() => onMoveChange(0, 0)}
+          style={{
+            border: "none",
+            borderRadius: 8,
+            padding: "9px 0",
+            background: "#334155",
+            color: "#dbeafe",
+            fontWeight: 800,
+          }}
+        >
+          LEFT
+        </button>
+        <button
+          onPointerDown={() => onMoveChange(1, 0)}
+          onPointerUp={() => onMoveChange(0, 0)}
+          onPointerCancel={() => onMoveChange(0, 0)}
+          onPointerLeave={() => onMoveChange(0, 0)}
+          style={{
+            border: "none",
+            borderRadius: 8,
+            padding: "9px 0",
+            background: "#334155",
+            color: "#dbeafe",
+            fontWeight: 800,
+          }}
+        >
+          RIGHT
+        </button>
+        <button
+          onPointerDown={() => onMoveChange(0, 1)}
+          onPointerUp={() => onMoveChange(0, 0)}
+          onPointerCancel={() => onMoveChange(0, 0)}
+          onPointerLeave={() => onMoveChange(0, 0)}
+          style={{
+            border: "none",
+            borderRadius: 8,
+            padding: "9px 0",
+            background: "#0ea5e9",
+            color: "#001018",
+            fontWeight: 800,
+          }}
+        >
+          FORWARD
+        </button>
+        <button
+          onPointerDown={() => onMoveChange(0, -1)}
+          onPointerUp={() => onMoveChange(0, 0)}
+          onPointerCancel={() => onMoveChange(0, 0)}
+          onPointerLeave={() => onMoveChange(0, 0)}
+          style={{
+            border: "none",
+            borderRadius: 8,
+            padding: "9px 0",
+            background: "#334155",
+            color: "#dbeafe",
+            fontWeight: 800,
+          }}
+        >
+          BACK
+        </button>
+      </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button
           onPointerDown={() => onLiftChange(1)}
@@ -1317,6 +1398,7 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(false);
   const [motionSupported, setMotionSupported] = useState(false);
   const [motionEnabled, setMotionEnabled] = useState(false);
+  const [motionMessage, setMotionMessage] = useState("Tilt not active yet.");
   const [apiStatus, setApiStatus] = useState({
     remaining: null,
     limit: null,
@@ -1328,8 +1410,15 @@ export default function App() {
 
   const boomTimerRef = useRef(null);
   const assistTimerRef = useRef(null);
-  const mobileInputRef = useRef({ turn: 0, thrust: 0, lift: 0 });
+  const mobileInputRef = useRef({
+    tiltTurn: 0,
+    tiltThrust: 0,
+    manualTurn: 0,
+    manualThrust: 0,
+    lift: 0,
+  });
   const neutralOrientationRef = useRef(null);
+  const orientationSeenRef = useRef(false);
 
   const helicopterStateRef = useRef({
     position: new THREE.Vector3(0, 42, 0),
@@ -1449,10 +1538,20 @@ export default function App() {
   useEffect(() => {
     if (!motionEnabled) return undefined;
 
+    orientationSeenRef.current = false;
+    setMotionMessage("Waiting for sensor data...");
+    const noDataTimer = setTimeout(() => {
+      if (!orientationSeenRef.current) {
+        setMotionMessage("No motion data. Use touch controls below.");
+      }
+    }, 3000);
+
     const onOrientation = (event) => {
       const beta = typeof event.beta === "number" ? event.beta : null;
       const gamma = typeof event.gamma === "number" ? event.gamma : null;
       if (beta === null || gamma === null) return;
+      orientationSeenRef.current = true;
+      setMotionMessage("Tilt active. Keep phone near neutral for stable flight.");
 
       if (!neutralOrientationRef.current) {
         neutralOrientationRef.current = { beta, gamma };
@@ -1465,9 +1564,13 @@ export default function App() {
       const targetTurn = clamp(dGamma / 24, -1, 1);
       const targetThrust = clamp(dBeta / 20, -1, 1);
 
-      mobileInputRef.current.turn = THREE.MathUtils.lerp(mobileInputRef.current.turn, targetTurn, 0.28);
-      mobileInputRef.current.thrust = THREE.MathUtils.lerp(
-        mobileInputRef.current.thrust,
+      mobileInputRef.current.tiltTurn = THREE.MathUtils.lerp(
+        mobileInputRef.current.tiltTurn,
+        targetTurn,
+        0.28
+      );
+      mobileInputRef.current.tiltThrust = THREE.MathUtils.lerp(
+        mobileInputRef.current.tiltThrust,
         targetThrust,
         0.28
       );
@@ -1475,9 +1578,10 @@ export default function App() {
 
     window.addEventListener("deviceorientation", onOrientation, true);
     return () => {
+      clearTimeout(noDataTimer);
       window.removeEventListener("deviceorientation", onOrientation, true);
-      mobileInputRef.current.turn = 0;
-      mobileInputRef.current.thrust = 0;
+      mobileInputRef.current.tiltTurn = 0;
+      mobileInputRef.current.tiltThrust = 0;
       neutralOrientationRef.current = null;
     };
   }, [motionEnabled]);
@@ -1730,6 +1834,7 @@ export default function App() {
 
       neutralOrientationRef.current = null;
       setMotionEnabled(true);
+      setMotionMessage("Motion permission granted. Tilt to fly.");
       setSearchStatus("Tilt controls enabled. Tilt left/right to steer, forward/back to move.");
     } catch {
       setSearchStatus("Could not enable motion controls on this browser.");
@@ -1738,6 +1843,11 @@ export default function App() {
 
   const handleMobileLiftChange = (value) => {
     mobileInputRef.current.lift = clamp(value, -1, 1);
+  };
+
+  const handleMobileMoveChange = (turn, thrust) => {
+    mobileInputRef.current.manualTurn = clamp(turn, -1, 1);
+    mobileInputRef.current.manualThrust = clamp(thrust, -1, 1);
   };
 
   if (loading) {
@@ -1763,25 +1873,26 @@ export default function App() {
       <div
         style={{
           position: "absolute",
-          top: 16,
-          right: 16,
+          top: isMobile ? 8 : 16,
+          left: isMobile ? 8 : "auto",
+          right: isMobile ? 8 : 16,
           zIndex: 30,
           display: "flex",
           alignItems: "center",
-          gap: 8,
+          gap: isMobile ? 6 : 8,
           background: "rgba(2, 6, 23, 0.88)",
           border: "1px solid rgba(34, 211, 238, 0.62)",
           boxShadow: "0 10px 28px rgba(0, 0, 0, 0.45)",
           borderRadius: 10,
-          padding: 10,
-          width: "min(90vw, 900px)",
+          padding: isMobile ? 8 : 10,
+          width: isMobile ? "calc(100vw - 16px)" : "min(90vw, 900px)",
         }}
       >
         <div
           style={{
             color: "#a5f3fc",
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: 18,
+            fontSize: isMobile ? 12 : 18,
             padding: "0 2px",
             whiteSpace: "nowrap",
             fontWeight: 700,
@@ -1802,8 +1913,8 @@ export default function App() {
             color: "#e2e8f0",
             border: "1px solid #475569",
             borderRadius: 6,
-            padding: "12px 14px",
-            fontSize: 19,
+            padding: isMobile ? "9px 10px" : "12px 14px",
+            fontSize: isMobile ? 14 : 19,
             outline: "none",
           }}
         />
@@ -1814,10 +1925,10 @@ export default function App() {
             color: "#001018",
             border: "none",
             borderRadius: 6,
-            padding: "12px 16px",
+            padding: isMobile ? "9px 10px" : "12px 16px",
             cursor: "pointer",
             fontWeight: 600,
-            fontSize: 18,
+            fontSize: isMobile ? 13 : 18,
             whiteSpace: "nowrap",
           }}
         >
@@ -1828,25 +1939,26 @@ export default function App() {
       <div
         style={{
           position: "absolute",
-          top: 92,
-          right: 16,
+          top: isMobile ? 58 : 92,
+          left: isMobile ? 8 : "auto",
+          right: isMobile ? 8 : 16,
           zIndex: 30,
           display: "flex",
           alignItems: "center",
-          gap: 8,
+          gap: isMobile ? 6 : 8,
           background: "rgba(2, 6, 23, 0.86)",
           border: "1px solid rgba(250, 204, 21, 0.55)",
           boxShadow: "0 8px 20px rgba(0, 0, 0, 0.4)",
           borderRadius: 10,
-          padding: 10,
-          width: "min(90vw, 900px)",
+          padding: isMobile ? 8 : 10,
+          width: isMobile ? "calc(100vw - 16px)" : "min(90vw, 900px)",
         }}
       >
         <div
           style={{
             color: "#fde68a",
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: 18,
+            fontSize: isMobile ? 12 : 18,
             padding: "0 2px",
             whiteSpace: "nowrap",
             fontWeight: 700,
@@ -1867,8 +1979,8 @@ export default function App() {
             color: "#e2e8f0",
             border: "1px solid #475569",
             borderRadius: 6,
-            padding: "12px 14px",
-            fontSize: 19,
+            padding: isMobile ? "9px 10px" : "12px 14px",
+            fontSize: isMobile ? 14 : 19,
             outline: "none",
           }}
         />
@@ -1879,10 +1991,10 @@ export default function App() {
             color: "#111827",
             border: "none",
             borderRadius: 6,
-            padding: "12px 16px",
+            padding: isMobile ? "9px 10px" : "12px 16px",
             cursor: "pointer",
             fontWeight: 700,
-            fontSize: 18,
+            fontSize: isMobile ? 13 : 18,
             whiteSpace: "nowrap",
           }}
         >
@@ -1896,10 +2008,10 @@ export default function App() {
               color: "#052e16",
               border: "none",
               borderRadius: 6,
-              padding: "12px 16px",
+              padding: isMobile ? "9px 10px" : "12px 16px",
               cursor: "pointer",
               fontWeight: 700,
-              fontSize: 18,
+              fontSize: isMobile ? 13 : 18,
               whiteSpace: "nowrap",
             }}
           >
@@ -1911,20 +2023,22 @@ export default function App() {
       <div
         style={{
           position: "absolute",
-          top: 168,
-          right: 16,
+          top: isMobile ? 108 : 168,
+          left: isMobile ? 8 : "auto",
+          right: isMobile ? 8 : 16,
           zIndex: 30,
           display: "flex",
           gap: 8,
           background: "rgba(2, 6, 23, 0.86)",
           border: "1px solid rgba(56, 189, 248, 0.45)",
           borderRadius: 10,
-          padding: 10,
-          width: "min(90vw, 900px)",
+          padding: isMobile ? 8 : 10,
+          width: isMobile ? "calc(100vw - 16px)" : "min(90vw, 900px)",
           alignItems: "center",
+          overflowX: isMobile ? "auto" : "visible",
         }}
       >
-        <div style={{ color: "#93c5fd", fontSize: 16, fontWeight: 700, whiteSpace: "nowrap" }}>
+        <div style={{ color: "#93c5fd", fontSize: isMobile ? 12 : 16, fontWeight: 700, whiteSpace: "nowrap" }}>
           Visual Preset:
         </div>
         {Object.entries(VISUAL_PRESETS).map(([key, value]) => (
@@ -1936,10 +2050,11 @@ export default function App() {
               color: visualPreset === key ? "#001018" : "#cbd5e1",
               border: "none",
               borderRadius: 6,
-              padding: "10px 12px",
-              fontSize: 15,
+              padding: isMobile ? "8px 10px" : "10px 12px",
+              fontSize: isMobile ? 12 : 15,
               fontWeight: 700,
               cursor: "pointer",
+              whiteSpace: "nowrap",
             }}
           >
             {value.label}
@@ -1952,11 +2067,12 @@ export default function App() {
             color: "#052e16",
             border: "none",
             borderRadius: 6,
-            padding: "10px 12px",
-            fontSize: 15,
+            padding: isMobile ? "8px 10px" : "10px 12px",
+            fontSize: isMobile ? 12 : 15,
             fontWeight: 700,
             cursor: "pointer",
             marginLeft: "auto",
+            whiteSpace: "nowrap",
           }}
         >
           Focus Downtown
@@ -1967,17 +2083,18 @@ export default function App() {
         <div
           style={{
             position: "absolute",
-            top: 232,
-            right: 16,
+            top: isMobile ? 156 : 232,
+            left: isMobile ? 8 : "auto",
+            right: isMobile ? 8 : 16,
             zIndex: 30,
             color: "#bae6fd",
             background: "rgba(2, 6, 23, 0.78)",
             border: "1px solid rgba(34, 211, 238, 0.45)",
             borderRadius: 8,
-            padding: "8px 12px",
-            fontSize: 18,
+            padding: isMobile ? "6px 10px" : "8px 12px",
+            fontSize: isMobile ? 13 : 18,
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            width: "min(90vw, 900px)",
+            width: isMobile ? "calc(100vw - 16px)" : "min(90vw, 900px)",
             textAlign: "center",
           }}
         >
@@ -2013,43 +2130,50 @@ export default function App() {
         helicopter={telemetry}
         highlightedBuilding={highlightedBuilding}
         onJump={handleJumpToHighlighted}
+        isMobile={isMobile}
       />
 
-      <StatsPanel fps={telemetry.fps} buildingCount={buildings.length} apiStatus={apiStatus} />
+      <StatsPanel fps={telemetry.fps} buildingCount={buildings.length} apiStatus={apiStatus} isMobile={isMobile} />
 
       <MobileFlightControls
         isMobile={isMobile}
         motionEnabled={motionEnabled}
         motionSupported={motionSupported}
         onEnableMotion={handleEnableMotion}
+        onMoveChange={handleMobileMoveChange}
         onLiftChange={handleMobileLiftChange}
+        motionMessage={motionMessage}
       />
 
       {selectedBuilding ? (
         <div
           style={{
             position: "absolute",
-            right: 14,
-            top: "50%",
-            transform: "translateY(-50%)",
+            right: isMobile ? 8 : 14,
+            left: isMobile ? 8 : "auto",
+            top: isMobile ? "auto" : "50%",
+            bottom: isMobile ? 188 : "auto",
+            transform: isMobile ? "none" : "translateY(-50%)",
             zIndex: 32,
-            width: 320,
+            width: isMobile ? "calc(100vw - 16px)" : 320,
             background: "rgba(2, 6, 23, 0.92)",
             border: "1px solid rgba(34, 211, 238, 0.55)",
             borderRadius: 10,
-            padding: 14,
+            padding: isMobile ? 10 : 14,
             boxShadow: "0 12px 30px rgba(0,0,0,0.5)",
             color: "#bae6fd",
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
           }}
         >
-          <div style={{ fontSize: 14, marginBottom: 8, color: "#67e8f9" }}>Building Selected</div>
-          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>@{selectedBuilding.username}</div>
-          <div style={{ fontSize: 13, marginBottom: 2 }}>Repos: {selectedBuilding.posts ?? 0}</div>
-          <div style={{ fontSize: 13, marginBottom: 12 }}>
+          <div style={{ fontSize: isMobile ? 12 : 14, marginBottom: 8, color: "#67e8f9" }}>Building Selected</div>
+          <div style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, marginBottom: 8 }}>
+            @{selectedBuilding.username}
+          </div>
+          <div style={{ fontSize: isMobile ? 12 : 13, marginBottom: 2 }}>Repos: {selectedBuilding.posts ?? 0}</div>
+          <div style={{ fontSize: isMobile ? 12 : 13, marginBottom: 12 }}>
             Followers: {selectedBuilding.activityScore ?? 0}
           </div>
-          <div style={{ fontSize: 13, marginBottom: 10, color: "#cbd5e1" }}>
+          <div style={{ fontSize: isMobile ? 12 : 13, marginBottom: 10, color: "#cbd5e1" }}>
             Would you like to visit this profile?
           </div>
           <div style={{ display: "flex", gap: 8 }}>
