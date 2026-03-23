@@ -2063,6 +2063,7 @@ export default function App() {
           zIndex: 30,
           display: "flex",
           gap: 8,
+          flexWrap: "wrap",
           background: "rgba(2, 6, 23, 0.86)",
           border: "1px solid rgba(56, 189, 248, 0.45)",
           borderRadius: 10,
@@ -2094,23 +2095,31 @@ export default function App() {
             {value.label}
           </button>
         ))}
-        <button
-          onClick={handleFocusDowntown}
+        <div
           style={{
-            background: "#22c55e",
-            color: "#052e16",
-            border: "none",
-            borderRadius: 6,
-            padding: isMobile ? "8px 10px" : "5px 7px",
-            fontSize: isMobile ? 12 : 9,
-            fontWeight: 700,
-            cursor: "pointer",
-            marginLeft: "auto",
-            whiteSpace: "nowrap",
+            flexBasis: "100%",
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: 2,
           }}
         >
-          Focus Downtown
-        </button>
+          <button
+            onClick={handleFocusDowntown}
+            style={{
+              background: "#22c55e",
+              color: "#052e16",
+              border: "none",
+              borderRadius: 6,
+              padding: isMobile ? "8px 10px" : "5px 7px",
+              fontSize: isMobile ? 12 : 9,
+              fontWeight: 700,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Focus Downtown
+          </button>
+        </div>
       </div>
 
       {searchStatus ? (
