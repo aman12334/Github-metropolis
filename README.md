@@ -22,7 +22,7 @@ The city uses downtown clustering so high-value users are concentrated toward th
 
 ## Features
 
-- Real GitHub data integration (`location:Maryland` search + user detail fetch)
+- Real GitHub data integration using live geolocation (reverse geocoding + nearby location search)
 - Default user injection (`your-GitHub-username`)
 - Add any GitHub username into the city
 - Search and highlight any available username
@@ -93,4 +93,5 @@ npm run build
 
 - Keep your GitHub token private. Do not commit real tokens to public repos.
 - If GitHub rate limits are hit, search/add calls may fail until reset time.
+- On first load, browser location permission is requested to build a local city. If denied, a broad fallback region is used.
 - For smoother FPS on laptops, use lower browser zoom and keep other GPU-heavy tabs closed.

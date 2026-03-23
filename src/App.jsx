@@ -173,33 +173,89 @@ async function fetchGitHubUser(username, onRate) {
   return normalizeUser(await response.json());
 }
 
-async function fetchMarylandUsers(onRate) {
+function getBrowserCoordinates() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation unavailable"));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      (error) => reject(error),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  });
+}
+
+async function reverseGeocodeCoordinates(lat, lng) {
   const response = await fetch(
-    "https://api.github.com/search/users?q=location:Maryland&per_page=60",
-    { headers: getHeaders() }
+    `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
   );
+  if (!response.ok) return null;
 
-  onRate?.(readRateInfo(response.headers), response.status);
+  const json = await response.json();
+  const city =
+    json.city ||
+    json.locality ||
+    json.principalSubdivision ||
+    json.localityInfo?.informative?.[0]?.name ||
+    "";
+  const region = json.principalSubdivision || "";
+  const country = json.countryName || "";
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch Maryland users");
+  const terms = dedupeUsers(
+    [city, `${city} ${region}`.trim(), region, country]
+      .map((t) => (typeof t === "string" ? t.trim() : ""))
+      .filter(Boolean)
+      .map((term) => ({ username: term }))
+  ).map((x) => x.username);
+
+  return { city, region, country, terms };
+}
+
+async function fetchUsersByLocationTerms(terms, onRate, maxUsers = 60) {
+  const uniqueTerms = [...new Set((terms || []).map((t) => t.trim()).filter(Boolean))].slice(0, 5);
+  const candidateMap = new Map();
+
+  for (let i = 0; i < uniqueTerms.length && candidateMap.size < maxUsers; i += 1) {
+    const term = uniqueTerms[i];
+    const query = encodeURIComponent(`location:\"${term}\"`);
+    const response = await fetch(
+      `https://api.github.com/search/users?q=${query}&per_page=60`,
+      { headers: getHeaders() }
+    );
+    onRate?.(readRateInfo(response.headers), response.status);
+    if (!response.ok) continue;
+
+    const data = await response.json();
+    const items = data.items || [];
+    for (let j = 0; j < items.length && candidateMap.size < maxUsers; j += 1) {
+      const item = items[j];
+      if (!item?.login || !item?.url) continue;
+      candidateMap.set(item.login.toLowerCase(), item.url);
+    }
   }
 
-  const searchData = await response.json();
-  const items = (searchData.items || []).slice(0, 60);
-
-  const detailRequests = items.map(async (item) => {
-    const detailResponse = await fetch(item.url, { headers: getHeaders() });
+  const urls = [...candidateMap.values()].slice(0, maxUsers);
+  const detailRequests = urls.map(async (url) => {
+    const detailResponse = await fetch(url, { headers: getHeaders() });
     onRate?.(readRateInfo(detailResponse.headers), detailResponse.status);
     if (!detailResponse.ok) return null;
     return normalizeUser(await detailResponse.json());
   });
 
   const settled = await Promise.allSettled(detailRequests);
-
-  return settled
+  const users = settled
     .filter((result) => result.status === "fulfilled" && result.value)
     .map((result) => result.value);
+
+  return dedupeUsers(users).slice(0, maxUsers);
 }
 
 function HelicopterModel({ helicopterStateRef }) {
@@ -276,6 +332,7 @@ function HoverRig({
   helicopterStateRef,
   focusPoint,
   onTelemetry,
+  mobileInputRef,
 }) {
   const { camera } = useThree();
   const velocity = useRef(new THREE.Vector3());
@@ -390,8 +447,8 @@ function HoverRig({
     };
 
     const onPointerDown = (event) => {
-      if (event.button !== 2 && event.button !== 1) return;
       if (!isCanvasTarget(event.target)) return;
+      if (event.pointerType !== "touch" && event.button !== 2 && event.button !== 1) return;
       lookDragActive.current = true;
       lastMouse.current.x = event.clientX;
       lastMouse.current.y = event.clientY;
@@ -399,7 +456,7 @@ function HoverRig({
     };
 
     const onPointerUp = (event) => {
-      if (event.button !== 2 && event.button !== 1) return;
+      if (event.pointerType !== "touch" && event.button !== 2 && event.button !== 1) return;
       lookDragActive.current = false;
       targetLookYaw.current = 0;
       targetLookPitch.current = 0;
@@ -436,11 +493,18 @@ function HoverRig({
   useFrame((_, delta) => {
     crashCooldown.current = Math.max(0, crashCooldown.current - delta);
 
-    const turnInput = (keys.current.ArrowLeft ? 1 : 0) - (keys.current.ArrowRight ? 1 : 0);
-    const thrustInput = (keys.current.ArrowUp ? 1 : 0) - (keys.current.ArrowDown ? 1 : 0);
-    const liftInput =
+    const keyboardTurn = (keys.current.ArrowLeft ? 1 : 0) - (keys.current.ArrowRight ? 1 : 0);
+    const keyboardThrust = (keys.current.ArrowUp ? 1 : 0) - (keys.current.ArrowDown ? 1 : 0);
+    const keyboardLift =
       (keys.current.Space || keys.current.KeyE ? 1 : 0) -
       (keys.current.ShiftLeft || keys.current.ShiftRight || keys.current.KeyQ ? 1 : 0);
+    const mobileTurn = mobileInputRef?.current?.turn ?? 0;
+    const mobileThrust = mobileInputRef?.current?.thrust ?? 0;
+    const mobileLift = mobileInputRef?.current?.lift ?? 0;
+
+    const turnInput = clamp(keyboardTurn + mobileTurn, -1, 1);
+    const thrustInput = clamp(keyboardThrust + mobileThrust, -1, 1);
+    const liftInput = clamp(keyboardLift + mobileLift, -1, 1);
 
     if (keys.current.KeyR) {
       targetLookYaw.current = 0;
@@ -878,6 +942,7 @@ function CityScene({
   helicopterPosition,
   searchAssist,
   visual,
+  mobileInputRef,
 }) {
   const preset = VISUAL_PRESETS[visual] ?? VISUAL_PRESETS.dystopian;
 
@@ -938,6 +1003,7 @@ function CityScene({
         helicopterStateRef={helicopterStateRef}
         focusPoint={focusPoint}
         onTelemetry={onTelemetry}
+        mobileInputRef={mobileInputRef}
       />
 
       <EffectComposer multisampling={0}>
@@ -952,7 +1018,7 @@ function CityScene({
   );
 }
 
-function GameHud({ boom }) {
+function GameHud({ boom, isMobile }) {
   return (
     <div
       style={{
@@ -996,6 +1062,14 @@ function GameHud({ boom }) {
         SEARCH BUILDING: highlight + camera assist
         <br />
         MINI-MAP: jump near highlighted tower
+        {isMobile ? (
+          <>
+            <br />
+            MOBILE: tilt phone to steer and move
+            <br />
+            MOBILE: hold UP/DOWN buttons to change altitude
+          </>
+        ) : null}
       </div>
 
       {boom ? (
@@ -1136,6 +1210,96 @@ function StatsPanel({ fps, buildingCount, apiStatus }) {
   );
 }
 
+function MobileFlightControls({
+  isMobile,
+  motionEnabled,
+  motionSupported,
+  onEnableMotion,
+  onLiftChange,
+}) {
+  if (!isMobile) return null;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        right: 14,
+        bottom: 18,
+        zIndex: 40,
+        width: 220,
+        background: "rgba(2, 6, 23, 0.88)",
+        border: "1px solid rgba(34, 211, 238, 0.55)",
+        borderRadius: 12,
+        padding: 10,
+        color: "#bae6fd",
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+        fontSize: 13,
+        lineHeight: 1.4,
+        boxShadow: "0 12px 28px rgba(0,0,0,0.45)",
+      }}
+    >
+      <div style={{ fontWeight: 700, color: "#67e8f9", marginBottom: 6 }}>Mobile Flight</div>
+      <div style={{ marginBottom: 8 }}>
+        {motionEnabled ? "Tilt steering active" : "Enable motion controls for tilt steering"}
+      </div>
+      {!motionEnabled ? (
+        <button
+          onClick={onEnableMotion}
+          disabled={!motionSupported}
+          style={{
+            width: "100%",
+            border: "none",
+            borderRadius: 8,
+            padding: "9px 10px",
+            background: motionSupported ? "#0ea5e9" : "#334155",
+            color: motionSupported ? "#001018" : "#94a3b8",
+            fontWeight: 700,
+            marginBottom: 8,
+          }}
+        >
+          {motionSupported ? "Enable Tilt Controls" : "Motion Not Supported"}
+        </button>
+      ) : null}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onPointerDown={() => onLiftChange(1)}
+          onPointerUp={() => onLiftChange(0)}
+          onPointerCancel={() => onLiftChange(0)}
+          onPointerLeave={() => onLiftChange(0)}
+          style={{
+            flex: 1,
+            border: "none",
+            borderRadius: 8,
+            padding: "10px 0",
+            background: "#22c55e",
+            color: "#052e16",
+            fontWeight: 800,
+          }}
+        >
+          UP
+        </button>
+        <button
+          onPointerDown={() => onLiftChange(-1)}
+          onPointerUp={() => onLiftChange(0)}
+          onPointerCancel={() => onLiftChange(0)}
+          onPointerLeave={() => onLiftChange(0)}
+          style={{
+            flex: 1,
+            border: "none",
+            borderRadius: 8,
+            padding: "10px 0",
+            background: "#f59e0b",
+            color: "#111827",
+            fontWeight: 800,
+          }}
+        >
+          DOWN
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [data, setData] = useState([]);
   const [focusedUser, setFocusedUser] = useState(null);
@@ -1150,6 +1314,9 @@ export default function App() {
   const [boom, setBoom] = useState(false);
   const [visualPreset, setVisualPreset] = useState("dystopian");
   const [searchAssist, setSearchAssist] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [motionSupported, setMotionSupported] = useState(false);
+  const [motionEnabled, setMotionEnabled] = useState(false);
   const [apiStatus, setApiStatus] = useState({
     remaining: null,
     limit: null,
@@ -1161,6 +1328,8 @@ export default function App() {
 
   const boomTimerRef = useRef(null);
   const assistTimerRef = useRef(null);
+  const mobileInputRef = useRef({ turn: 0, thrust: 0, lift: 0 });
+  const neutralOrientationRef = useRef(null);
 
   const helicopterStateRef = useRef({
     position: new THREE.Vector3(0, 42, 0),
@@ -1194,21 +1363,30 @@ export default function App() {
         const validSaved = Array.isArray(savedUsernames)
           ? savedUsernames.filter((u) => typeof u === "string" && u.trim())
           : [];
+        let locationUsers = [];
+        let locationLabel = "";
 
-        const marylandUsersPromise = fetchMarylandUsers(updateRate);
+        try {
+          const coords = await getBrowserCoordinates();
+          const geo = await reverseGeocodeCoordinates(coords.lat, coords.lng);
+          const geoTerms =
+            geo?.terms?.length > 0
+              ? geo.terms
+              : ["United States"];
+
+          locationUsers = await fetchUsersByLocationTerms(geoTerms, updateRate, 60);
+          locationLabel = [geo?.city, geo?.region, geo?.country].filter(Boolean).join(", ");
+        } catch {
+          locationUsers = await fetchUsersByLocationTerms(["United States"], updateRate, 60);
+          locationLabel = "your region";
+        }
+
         const defaultUserPromise = fetchGitHubUser(DEFAULT_USERNAME, updateRate);
-        const savedUsersPromise = Promise.all(
-          validSaved.map((username) => fetchGitHubUser(username, updateRate))
-        );
-
-        const [marylandUsers, defaultUser, savedUsers] = await Promise.all([
-          marylandUsersPromise,
-          defaultUserPromise,
-          savedUsersPromise,
-        ]);
+        const savedUsersPromise = Promise.all(validSaved.map((username) => fetchGitHubUser(username, updateRate)));
+        const [defaultUser, savedUsers] = await Promise.all([defaultUserPromise, savedUsersPromise]);
 
         const merged = dedupeUsers([
-          ...marylandUsers,
+          ...locationUsers,
           defaultUser,
           ...savedUsers.filter(Boolean),
         ]);
@@ -1225,6 +1403,9 @@ export default function App() {
         if (mounted) {
           setData(transformed);
           setCustomUsers(validSaved);
+          if (locationLabel) {
+            setSearchStatus(`City loaded from nearby GitHub users around ${locationLabel}.`);
+          }
           if (defaultUser) {
             setFocusedUser({ ...defaultUser, x: 0, z: 0 });
           }
@@ -1251,11 +1432,55 @@ export default function App() {
   }, [customUsers]);
 
   useEffect(() => {
+    const coarsePointer =
+      window.matchMedia?.("(pointer: coarse)")?.matches ||
+      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+    setIsMobile(Boolean(coarsePointer));
+    setMotionSupported(typeof window !== "undefined" && "DeviceOrientationEvent" in window);
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (boomTimerRef.current) clearTimeout(boomTimerRef.current);
       if (assistTimerRef.current) clearTimeout(assistTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!motionEnabled) return undefined;
+
+    const onOrientation = (event) => {
+      const beta = typeof event.beta === "number" ? event.beta : null;
+      const gamma = typeof event.gamma === "number" ? event.gamma : null;
+      if (beta === null || gamma === null) return;
+
+      if (!neutralOrientationRef.current) {
+        neutralOrientationRef.current = { beta, gamma };
+      }
+
+      const base = neutralOrientationRef.current;
+      const dBeta = beta - base.beta;
+      const dGamma = gamma - base.gamma;
+
+      const targetTurn = clamp(dGamma / 24, -1, 1);
+      const targetThrust = clamp(dBeta / 20, -1, 1);
+
+      mobileInputRef.current.turn = THREE.MathUtils.lerp(mobileInputRef.current.turn, targetTurn, 0.28);
+      mobileInputRef.current.thrust = THREE.MathUtils.lerp(
+        mobileInputRef.current.thrust,
+        targetThrust,
+        0.28
+      );
+    };
+
+    window.addEventListener("deviceorientation", onOrientation, true);
+    return () => {
+      window.removeEventListener("deviceorientation", onOrientation, true);
+      mobileInputRef.current.turn = 0;
+      mobileInputRef.current.thrust = 0;
+      neutralOrientationRef.current = null;
+    };
+  }, [motionEnabled]);
 
   const addOrFocusUser = useCallback(
     (detail, source = "add") => {
@@ -1485,6 +1710,34 @@ export default function App() {
       key: `downtown-${Date.now()}`,
     });
     setSearchStatus("Guided to downtown skyline core.");
+  };
+
+  const handleEnableMotion = async () => {
+    try {
+      if (!motionSupported) {
+        setSearchStatus("Motion controls are not supported on this device/browser.");
+        return;
+      }
+
+      const permissionApi = window.DeviceOrientationEvent?.requestPermission;
+      if (typeof permissionApi === "function") {
+        const result = await permissionApi();
+        if (result !== "granted") {
+          setSearchStatus("Motion permission denied. Tilt controls are disabled.");
+          return;
+        }
+      }
+
+      neutralOrientationRef.current = null;
+      setMotionEnabled(true);
+      setSearchStatus("Tilt controls enabled. Tilt left/right to steer, forward/back to move.");
+    } catch {
+      setSearchStatus("Could not enable motion controls on this browser.");
+    }
+  };
+
+  const handleMobileLiftChange = (value) => {
+    mobileInputRef.current.lift = clamp(value, -1, 1);
   };
 
   if (loading) {
@@ -1750,6 +2003,7 @@ export default function App() {
           helicopterPosition={telemetry}
           searchAssist={searchAssist}
           visual={visualPreset}
+          mobileInputRef={mobileInputRef}
         />
       </Canvas>
 
@@ -1762,6 +2016,14 @@ export default function App() {
       />
 
       <StatsPanel fps={telemetry.fps} buildingCount={buildings.length} apiStatus={apiStatus} />
+
+      <MobileFlightControls
+        isMobile={isMobile}
+        motionEnabled={motionEnabled}
+        motionSupported={motionSupported}
+        onEnableMotion={handleEnableMotion}
+        onLiftChange={handleMobileLiftChange}
+      />
 
       {selectedBuilding ? (
         <div
@@ -1847,7 +2109,7 @@ export default function App() {
         </div>
       ) : null}
 
-      <GameHud boom={boom} />
+      <GameHud boom={boom} isMobile={isMobile} />
     </div>
   );
 }
