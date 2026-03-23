@@ -113,6 +113,32 @@ function dedupeUsers(users) {
   return [...byUsername.values()];
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function withTimeout(promise, ms, fallbackValue = null) {
+  let done = false;
+  const timeoutPromise = sleep(ms).then(() => {
+    if (!done) return fallbackValue;
+    return fallbackValue;
+  });
+  const result = await Promise.race([promise, timeoutPromise]);
+  done = true;
+  return result;
+}
+
+async function runInBatches(items, batchSize, runner) {
+  const output = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const chunk = items.slice(i, i + batchSize);
+    const settled = await Promise.allSettled(chunk.map((item) => runner(item)));
+    for (let j = 0; j < settled.length; j += 1) {
+      const entry = settled[j];
+      if (entry.status === "fulfilled" && entry.value) output.push(entry.value);
+    }
+  }
+  return output;
+}
+
 function addGlow(users) {
   if (users.length === 0) return users;
   const min = Math.min(...users.map((u) => u.activityScore));
@@ -188,7 +214,7 @@ function getBrowserCoordinates() {
         });
       },
       (error) => reject(error),
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+      { enableHighAccuracy: false, timeout: 4500, maximumAge: 300000 }
     );
   });
 }
@@ -243,17 +269,12 @@ async function fetchUsersByLocationTerms(terms, onRate, maxUsers = 60) {
   }
 
   const urls = [...candidateMap.values()].slice(0, maxUsers);
-  const detailRequests = urls.map(async (url) => {
+  const users = await runInBatches(urls, 8, async (url) => {
     const detailResponse = await fetch(url, { headers: getHeaders() });
     onRate?.(readRateInfo(detailResponse.headers), detailResponse.status);
     if (!detailResponse.ok) return null;
     return normalizeUser(await detailResponse.json());
   });
-
-  const settled = await Promise.allSettled(detailRequests);
-  const users = settled
-    .filter((result) => result.status === "fulfilled" && result.value)
-    .map((result) => result.value);
 
   return dedupeUsers(users).slice(0, maxUsers);
 }
@@ -1447,31 +1468,44 @@ export default function App() {
     async function loadUsers() {
       setLoading(true);
       try {
+        const isLikelyMobile =
+          window.matchMedia?.("(pointer: coarse)")?.matches ||
+          /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+        const targetUserCount = isLikelyMobile ? 28 : 60;
+
         const savedRaw = localStorage.getItem(CUSTOM_USERS_STORAGE_KEY);
         const savedUsernames = savedRaw ? JSON.parse(savedRaw) : [];
         const validSaved = Array.isArray(savedUsernames)
           ? savedUsernames.filter((u) => typeof u === "string" && u.trim())
           : [];
+
+        setSearchStatus(
+          isLikelyMobile
+            ? "Loading optimized mobile skyline..."
+            : "Loading nearby GitHub skyline..."
+        );
+
+        const defaultUserPromise = fetchGitHubUser(DEFAULT_USERNAME, updateRate);
+        const savedUsersPromise = Promise.all(validSaved.map((username) => fetchGitHubUser(username, updateRate)));
+
         let locationUsers = [];
         let locationLabel = "";
 
         try {
           const coords = await getBrowserCoordinates();
-          const geo = await reverseGeocodeCoordinates(coords.lat, coords.lng);
+          const geo = await withTimeout(reverseGeocodeCoordinates(coords.lat, coords.lng), 2500, null);
           const geoTerms =
             geo?.terms?.length > 0
               ? geo.terms
               : ["United States"];
 
-          locationUsers = await fetchUsersByLocationTerms(geoTerms, updateRate, 60);
+          locationUsers = await fetchUsersByLocationTerms(geoTerms, updateRate, targetUserCount);
           locationLabel = [geo?.city, geo?.region, geo?.country].filter(Boolean).join(", ");
         } catch {
-          locationUsers = await fetchUsersByLocationTerms(["United States"], updateRate, 60);
+          locationUsers = await fetchUsersByLocationTerms(["United States"], updateRate, targetUserCount);
           locationLabel = "your region";
         }
 
-        const defaultUserPromise = fetchGitHubUser(DEFAULT_USERNAME, updateRate);
-        const savedUsersPromise = Promise.all(validSaved.map((username) => fetchGitHubUser(username, updateRate)));
         const [defaultUser, savedUsers] = await Promise.all([defaultUserPromise, savedUsersPromise]);
 
         const merged = dedupeUsers([
