@@ -1919,7 +1919,7 @@ export default function App() {
           boxShadow: "0 10px 28px rgba(0, 0, 0, 0.45)",
           borderRadius: 10,
           padding: isMobile ? 8 : 10,
-          width: isMobile ? "calc(100vw - 16px)" : "min(39vw, 370px)",
+          width: isMobile ? "calc(100vw - 16px)" : "min(66vw, 640px)",
         }}
       >
         <div
@@ -1985,7 +1985,7 @@ export default function App() {
           boxShadow: "0 8px 20px rgba(0, 0, 0, 0.4)",
           borderRadius: 10,
           padding: isMobile ? 8 : 10,
-          width: isMobile ? "calc(100vw - 16px)" : "min(39vw, 370px)",
+          width: isMobile ? "calc(100vw - 16px)" : "min(66vw, 640px)",
         }}
       >
         <div
@@ -2067,7 +2067,7 @@ export default function App() {
           border: "1px solid rgba(56, 189, 248, 0.45)",
           borderRadius: 10,
           padding: isMobile ? 8 : 10,
-          width: isMobile ? "calc(100vw - 16px)" : "min(39vw, 370px)",
+          width: isMobile ? "calc(100vw - 16px)" : "min(66vw, 640px)",
           alignItems: "center",
           overflowX: isMobile ? "auto" : "visible",
         }}
@@ -2128,7 +2128,7 @@ export default function App() {
             padding: isMobile ? "6px 10px" : "8px 12px",
             fontSize: isMobile ? 13 : 18,
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            width: isMobile ? "calc(100vw - 16px)" : "min(39vw, 370px)",
+            width: isMobile ? "calc(100vw - 16px)" : "min(66vw, 640px)",
             textAlign: "center",
           }}
         >
