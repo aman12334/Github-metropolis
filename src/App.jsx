@@ -1919,14 +1919,14 @@ export default function App() {
           boxShadow: "0 10px 28px rgba(0, 0, 0, 0.45)",
           borderRadius: 10,
           padding: isMobile ? 8 : 10,
-          width: isMobile ? "calc(100vw - 16px)" : "min(66vw, 640px)",
+          width: isMobile ? "calc(100vw - 16px)" : "min(33vw, 320px)",
         }}
       >
         <div
           style={{
             color: "#a5f3fc",
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: isMobile ? 12 : 18,
+            fontSize: isMobile ? 12 : 9,
             padding: "0 2px",
             whiteSpace: "nowrap",
             fontWeight: 700,
@@ -1947,8 +1947,8 @@ export default function App() {
             color: "#e2e8f0",
             border: "1px solid #475569",
             borderRadius: 6,
-            padding: isMobile ? "9px 10px" : "6px 7px",
-            fontSize: isMobile ? 14 : 19,
+            padding: isMobile ? "9px 10px" : "4px 5px",
+            fontSize: isMobile ? 14 : 10,
             outline: "none",
           }}
         />
@@ -1959,10 +1959,10 @@ export default function App() {
             color: "#001018",
             border: "none",
             borderRadius: 6,
-            padding: isMobile ? "9px 10px" : "12px 16px",
+            padding: isMobile ? "9px 10px" : "5px 7px",
             cursor: "pointer",
             fontWeight: 600,
-            fontSize: isMobile ? 13 : 18,
+            fontSize: isMobile ? 13 : 9,
             whiteSpace: "nowrap",
           }}
         >
@@ -1985,14 +1985,14 @@ export default function App() {
           boxShadow: "0 8px 20px rgba(0, 0, 0, 0.4)",
           borderRadius: 10,
           padding: isMobile ? 8 : 10,
-          width: isMobile ? "calc(100vw - 16px)" : "min(66vw, 640px)",
+          width: isMobile ? "calc(100vw - 16px)" : "min(33vw, 320px)",
         }}
       >
         <div
           style={{
             color: "#fde68a",
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: isMobile ? 12 : 18,
+            fontSize: isMobile ? 12 : 9,
             padding: "0 2px",
             whiteSpace: "nowrap",
             fontWeight: 700,
@@ -2013,8 +2013,8 @@ export default function App() {
             color: "#e2e8f0",
             border: "1px solid #475569",
             borderRadius: 6,
-            padding: isMobile ? "9px 10px" : "6px 7px",
-            fontSize: isMobile ? 14 : 19,
+            padding: isMobile ? "9px 10px" : "4px 5px",
+            fontSize: isMobile ? 14 : 10,
             outline: "none",
           }}
         />
@@ -2025,10 +2025,10 @@ export default function App() {
             color: "#111827",
             border: "none",
             borderRadius: 6,
-            padding: isMobile ? "9px 10px" : "12px 16px",
+            padding: isMobile ? "9px 10px" : "5px 7px",
             cursor: "pointer",
             fontWeight: 700,
-            fontSize: isMobile ? 13 : 18,
+            fontSize: isMobile ? 13 : 9,
             whiteSpace: "nowrap",
           }}
         >
@@ -2042,10 +2042,10 @@ export default function App() {
               color: "#052e16",
               border: "none",
               borderRadius: 6,
-              padding: isMobile ? "9px 10px" : "12px 16px",
+              padding: isMobile ? "9px 10px" : "5px 7px",
               cursor: "pointer",
               fontWeight: 700,
-              fontSize: isMobile ? 13 : 18,
+              fontSize: isMobile ? 13 : 9,
               whiteSpace: "nowrap",
             }}
           >
@@ -2067,12 +2067,12 @@ export default function App() {
           border: "1px solid rgba(56, 189, 248, 0.45)",
           borderRadius: 10,
           padding: isMobile ? 8 : 10,
-          width: isMobile ? "calc(100vw - 16px)" : "min(66vw, 640px)",
+          width: isMobile ? "calc(100vw - 16px)" : "min(33vw, 320px)",
           alignItems: "center",
           overflowX: isMobile ? "auto" : "visible",
         }}
       >
-        <div style={{ color: "#93c5fd", fontSize: isMobile ? 12 : 16, fontWeight: 700, whiteSpace: "nowrap" }}>
+        <div style={{ color: "#93c5fd", fontSize: isMobile ? 12 : 9, fontWeight: 700, whiteSpace: "nowrap" }}>
           Visual Preset:
         </div>
         {Object.entries(VISUAL_PRESETS).map(([key, value]) => (
@@ -2084,8 +2084,8 @@ export default function App() {
               color: visualPreset === key ? "#001018" : "#cbd5e1",
               border: "none",
               borderRadius: 6,
-              padding: isMobile ? "8px 10px" : "10px 12px",
-              fontSize: isMobile ? 12 : 15,
+              padding: isMobile ? "8px 10px" : "5px 7px",
+              fontSize: isMobile ? 12 : 9,
               fontWeight: 700,
               cursor: "pointer",
               whiteSpace: "nowrap",
@@ -2101,8 +2101,8 @@ export default function App() {
             color: "#052e16",
             border: "none",
             borderRadius: 6,
-            padding: isMobile ? "8px 10px" : "10px 12px",
-            fontSize: isMobile ? 12 : 15,
+            padding: isMobile ? "8px 10px" : "5px 7px",
+            fontSize: isMobile ? 12 : 9,
             fontWeight: 700,
             cursor: "pointer",
             marginLeft: "auto",
@@ -2128,7 +2128,7 @@ export default function App() {
             padding: isMobile ? "6px 10px" : "8px 12px",
             fontSize: isMobile ? 13 : 18,
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            width: isMobile ? "calc(100vw - 16px)" : "min(66vw, 640px)",
+            width: isMobile ? "calc(100vw - 16px)" : "min(33vw, 320px)",
             textAlign: "center",
           }}
         >
